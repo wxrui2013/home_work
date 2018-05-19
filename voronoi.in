@@ -1,0 +1,55 @@
+# caculate radial distribution function (RDF) of  sample !(you can change cutoff of EAM potential function in specifed file)
+# input dumpfile that include some configurations of sample within nvt equilibiration.
+# example to use rerun              
+read_data 	sample.data   #creat a box of simulation
+pair_style      eam/alloy
+pair_coeff      * * ZrCu.lammps.eam Zr Cu
+
+group 		cu type 2
+group 		zr type 1
+timestep        0.002
+#variables that could be used by yourself. 
+variable	n equal count(all)
+variable 	p equal pe/$n
+variable 	v equal vol/$n
+variable 	t equal temp 
+variable 	s equal step
+variable 	pres equal press
+#comm_modify	cutoff 5.0
+neighbor	 3  bin			#could be ignored
+#neigh_modify	every 3 delay 0 check yes #..
+#computations that you want
+#compute         myRDF all rdf 500 1 1 1 2 2 1 2 2
+#compute         rdf all rdf 500
+#fix for output RDF-----------------------------------
+#fix		21 all ave/time  10000 50 500000 c_myRDF file rdf.300k mode vector
+#fix		22 all ave/time  10000 50 500000 c_rdf file rdf1.300k mode vector
+#-----for coordinate number of atoms in sample----------
+##compute        CNcu cu coord/atom 3.735 2 1 *
+#compute         CNzr zr coord/atom 4.125 1 2 *
+##fix 		1 cu ave/atom 	10000 50 500000 c_CNcu[1] c_CNcu[2] c_CNcu[3]    #average for many snapshot
+#fix 		2 zr ave/atom   10000 50 500000 c_CNzr[1] c_CNzr[2] c_CNzr[3]
+#dump 		1 cu custom 500000  cn.dat id type c_CNcu			#output CN for one snapshot
+#dump 		2 zr custom 500000 cn1.dat id type c_CNzr
+##dump		3 cu custom 500000 cncu.dat id type f_1[1] f_1[2] f_1[3]		
+#dump 		4 zr custom 500000 cnzr.dat id type f_2[1] f_2[2] f_2[3]	
+#---------------voronoi---------------------------------
+#variable 	r1 atom (type==1)*1.587+(type==2)*1.238
+#compute		voro all voronoi/atom radius v_r1
+#fix             1 all ave/atom   10000 50 500000 c_voro[1] c_voro[2]
+#dump 		6 all custom 500000 voronoi2.dat id type f_1[1] f_1[2] 
+#dump 		5 all custom 500000 voronoi.dat id type c_voro[1] c_voro[2] # c_voro[3] #c_voro[4]
+#--------------CNA /atom--------------------------------(common neighbors analysis)--
+compute 	cna1 zr cna/atom  3.705 #4.095    the result is equal 
+fix		1 zr ave/atom 10000 50 500000 c_cna1
+dump		7 zr custom 500000 cnazr.dat id type f_1
+dump 		8 zr custom 500000 cnazr2.dat id type c_cna1
+
+compute 	cna2 cu cna/atom 3.705  # first minima of rdf_all
+fix		2 cu ave/atom 10000 50 500000 c_cna2
+dump 		9 cu custom 500000 cnacu.dat id type f_2	
+dump 		10 cu custom 500000 cnacu2.dat id type c_cna2
+
+
+#rerun section
+rerun 		dump.s1.300.50.lammpstrj first 10000 every 10000 dump x y z 

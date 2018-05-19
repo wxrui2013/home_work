@@ -1,0 +1,81 @@
+#perform a sample of Cu64.5Zr35.5 quench rate is 10^12k/s 
+units 		metal
+boundary 	p p p
+atom_style      atomic
+
+read_data       data.file
+#lattice 	fcc 3.614
+#region		mdbox block 0 10 0 10 0 25    #32000atoms
+#create_box	2 mdbox   
+#create_atoms	1 region mdbox
+#read_data 	data.txt
+mass            2   63.54
+mass            1   91.22
+#set             type  1  type/fraction  2  0.355  1234567   #p463
+
+#read_dump 	data.lammpstrj 0  x y z  scaled yes purge yes format native
+
+pair_style      eam/alloy
+pair_coeff      * * ZrCu.lammps.eam Zr Cu 
+
+group		zr type 1
+group 		cu type 2
+
+timestep        0.002
+velocity        all create 600 4928459 dist gaussian 
+run 		0
+min_style	cg
+minimize	1e-4 1e-6 100 1000
+
+variable	n equal count(all)
+variable 	ncu equal count(cu)
+variable 	nzr equal count(zr)
+variable 	p equal pe/$n
+variable 	v equal vol/$n
+variable 	t equal temp 
+variable 	s equal step
+variable 	pres equal press
+
+neighbor	 3.0 bin
+neigh_modify	every 3 delay 0 check yes
+
+compute 	myRDF all rdf 200 1 1 1 2 2 1 2 2
+compute 	rdf all rdf 200  
+#compute 	2 all voronoi/atom
+#compute 	mymsd all msd
+
+write_data 	data.file
+dump	1 all custom 1 dump.*.lammpstrj id type xs ys zs   #output first configuration for correcting it
+run	0 
+undump	1
+
+###################-------heating-------############################################
+
+fix     1 all npt temp $t 2000 0.25 iso 0 0 0.5 
+fix 	2 all print 1000  "$s  $t $v $p ${pres}" file heating.dat title " step temprature volume pe_atom press"
+restart 50000  restart.*
+thermo  1000
+thermo_style    custom step time temp etotal pe press vol atoms v_ncu v_nzr   # pxx pyy pzz pyz pxz pxy
+run     50000
+unfix 	1
+#################--------equilibrium------###########################################
+
+fix     1 all npt temp  2000 2000 0.2 iso 0 0 0.5 
+fix 	st1 all print 1000 "$s  $t $v $p ${pres}" file equil.dat title " step temprature volume pe_atom press"
+run 	250000
+#jump	frdf.in b1
+#label	cool
+#the aim of next section is to get sample of glasses 
+unfix 	1
+unfix 	st1
+################--------cooling----------########################################
+
+
+fix     1 all npt temp  $t 300 0.25  iso 0 0 0.5 
+fix 	tp all print 1000 "$s $t $v $p ${pres} " file stp.dat title "step temprature volume pe_atom press"
+fix     st2 all print 1000 "$s $t" file s_t2.dat title "step tempprature"
+#dump 	1 all atom 5000 dump.atom.$x
+dump    2 all custom 10000 dump.s1.lammpstrj id type xs ys zs
+run     850000
+print 	"ALL DONE"
+

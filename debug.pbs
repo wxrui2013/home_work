@@ -1,0 +1,7 @@
+#debug file that record ERROR informantions and solutions about PBS file
+#writer:wei xuerui
+#time 2016/06/28 
+topic :If PBS assignments is not run and send information about not so much slots for lammps ,then change pbs file
+details:  change 'select' to 'nodes' and change 'ncpus' to 'ppn'
+if you complish that ,the  work will be run.
+
